@@ -31,7 +31,8 @@ pub struct MpdVisualizer {
     // Audio Buffering & FFT State
     sample_buffer: Vec<f32>,
     fft: Arc<dyn Fft<f32>>,
-    //fft_scratch: Vec<Complex<f32>>,
+    fft_buffer: Vec<Complex<f32>>,
+    fft_scratch: Vec<Complex<f32>>,
     
     // Fallback State
     fallback_gradient: Vec<RgbS>,
@@ -52,8 +53,8 @@ impl MpdVisualizer {
             // Buffer capacity: roughly enough for a few ticks of overflow
             sample_buffer: Vec::with_capacity(FFT_SIZE * 2),
             fft,
-            //fft_scratch: vec![Complex::new(0.0, 0.0); FFT_SIZE], // Pre-allocate scratch space
-
+            fft_scratch: vec![Complex::new(0.0, 0.0); FFT_SIZE], // Pre-allocate scratch space
+            fft_buffer: vec![Complex::new(0.0, 0.0); FFT_SIZE],
             fallback_gradient: fallback_gradient,
             fallback_angle: 0.0,
             fallback_period: fallback_period,
@@ -134,24 +135,22 @@ impl MpdVisualizer {
 
         // If we have enough samples, run the FFT
         if self.sample_buffer.len() >= FFT_SIZE {
-            // Drain exactly FFT_SIZE samples
-            let window: Vec<Complex<f32>> = self.sample_buffer
-                .drain(0..FFT_SIZE)
-                .map(|x| Complex::new(x, 0.0))
-                .collect();
+            for (i, sample) in self.sample_buffer.drain(0..FFT_SIZE).enumerate() {
+                self.fft_buffer[i] = Complex::new(sample, 0.0);
+            }
 
-            self.perform_fft(window, leds);
+            self.perform_fft(leds);
         }
     }
 
-    fn perform_fft(&mut self, mut buffer: Vec<Complex<f32>>, leds: &mut [RgbS]) {
+    fn perform_fft(&mut self, leds: &mut [RgbS]) {
         // Run FFT
-        self.fft.process(&mut buffer);
+        self.fft.process_with_scratch(&mut self.fft_buffer, &mut self.fft_scratch);
 
         // Map Spectrum to 8 LEDs
         // We only care about the first half of the buffer (Nyquist frequency)
-        let output_len = buffer.len() / 2;
-        let spectrum = &buffer[0..output_len];
+        let output_len = self.fft_buffer.len() / 2;
+        let spectrum = &self.fft_buffer[0..output_len];
 
         // Define logarithmic bands for 8 sections (approximate indices for 1024 FFT @ 44.1k)
         // Hz: [0-60], [60-150], [150-400], [400-1k], [1k-2.5k], [2.5k-6k], [6k-12k], [12k+]
@@ -166,7 +165,7 @@ impl MpdVisualizer {
             let count = (end - start) as f32;
             for bin_idx in *start..*end {
                 if bin_idx < spectrum.len() {
-                    sum_mag += spectrum[bin_idx].norm();
+                    sum_mag += spectrum[bin_idx].norm_sqr();
                 }
             }
             let avg_mag = sum_mag / count;
