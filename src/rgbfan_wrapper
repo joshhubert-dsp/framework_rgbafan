@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Helper to validate hex codes (6 chars, 0-9, A-F)
+is_hex() {
+    [[ $1 =~ ^[0-9A-Fa-f]{6}$ ]]
+}
+
+case "$1" in
+    off)
+        OPTS="solid 000000"
+        ;;
+    solid)
+        if is_hex "$2"; then
+            OPTS="solid $2"
+        else
+            echo "Usage: rgbfan-wrapper solid [HEXCODE]"
+            exit 1
+        fi
+        ;;
+    mpd)
+        if is_hex "$2" && is_hex "$3" && is_hex "$4" && is_hex "$5"; then
+            OPTS="mpd $2 $3 $4 $5"
+        else
+            echo "Usage: led-set mpd [HEX1] [HEX2] [HEX3] [HEX4]"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Commands: "
+        echo "  rgbfan-wrapper off"
+        echo "  rgbfan-wrapper solid FF0000"
+        echo "  rgbfan-wrapper mpd 0E81AD D4002A FFFFFF D4002A"
+        exit 1
+        ;;
+esac
+
+# Update the environment file and restart
+echo "LED_OPTS=\"$OPTS\"" | sudo tee /etc/default/rgb-fan > /dev/null
+sudo systemctl restart rgb-fan.service
+
+echo "Applied: rgbafan $OPTS"
