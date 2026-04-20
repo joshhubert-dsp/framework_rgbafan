@@ -1,13 +1,7 @@
-use std::thread;
-use std::time::Duration;
-
 use framework_lib::chromium_ec::commands::RgbS;
 
 use crate::consts::{
     N_LEDS,
-    TICK_TIME_MS,
-    SOLID_REFRESH_PERIOD,
-    BLINK_PERIOD,
     SPIN_PERIOD,
     OFF,
     RAINBOW
@@ -19,7 +13,6 @@ pub enum Animation {
     Solid { color: RgbS },
     Blink {
         colors: Vec<RgbS>,
-        period: u16,    // unit in ticks
         current_color_index: u8,
         on: bool,
     },
@@ -54,7 +47,6 @@ impl Animation {
             "blink" => {
                 Animation::Blink{
                     colors,
-                    period: BLINK_PERIOD * TICK_TIME_MS,
                     current_color_index: 0,
                     on: false,
                 }
@@ -110,20 +102,15 @@ impl Animation {
     pub fn step(&mut self, leds: &mut [RgbS; N_LEDS]) {
         match self {
             Animation::Solid { color } => {
-                thread::sleep(Duration::from_millis(SOLID_REFRESH_PERIOD.into()));
-                
                 for led in leds {
                     *led = color.clone();
                 }
             },
             Animation::Blink {
                 colors,
-                period,
                 current_color_index,
                 on,
             } => {
-                thread::sleep(Duration::from_millis(*period as u64));
-
                 if *on {
                     for led in leds {
                         *led = OFF;

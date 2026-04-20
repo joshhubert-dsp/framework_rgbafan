@@ -13,6 +13,8 @@ mod consts;
 use consts::{OFF, N_LEDS, TICK_TIME_MS};
 use animations::Animation;
 
+use crate::consts::{BLINK_TICK_TIME_MS, SOLID_TICK_TIME_MS};
+
 
 #[derive(Debug)]
 enum HexParseError {
@@ -67,7 +69,16 @@ fn main() -> EcResult<()> {
         if let Err(e) = ec.rgbkbd_set_color(0, leds.to_vec()) {
             eprintln!("Error setting lights: {:?}", e);
         }
-        thread::sleep(Duration::from_millis(TICK_TIME_MS.into()));
+        
+        // TODO: just make this a cli input arg or fan speed controlled
+        let sleep_time: u16 = match animation {
+            Animation::Solid {color: _} => SOLID_TICK_TIME_MS,
+            Animation::Blink { colors: _, current_color_index: _, on: _ } => BLINK_TICK_TIME_MS,
+            _ => TICK_TIME_MS,
+        };
+        // NOTE: this is the only place the program sleeps now
+        thread::sleep(Duration::from_millis(sleep_time.into()))
+        
     }
         
 }
