@@ -16,6 +16,10 @@ pub enum Animation {
         current_color_index: u8,
         on: bool,
     },
+    Spin { 
+        colors: Vec<RgbS>,
+        idx: usize,    // current idx on discrete spin
+    },
     SmoothSpin {
         colors: Vec<RgbS>,
         period: u16,              // unit in ticks
@@ -24,6 +28,10 @@ pub enum Animation {
     RainbowSpin {
         idx: usize,    // current idx on rolling rainbow
     },
+    // RainbowSmoothSpin {
+    //     period: u16,              // unit in ticks
+    //     current_rotation: f32,    // unit in leds
+    // },
     Mpd {
         visualizer: MpdVisualizer,
     },
@@ -51,6 +59,10 @@ impl Animation {
                     on: false,
                 }
             },
+            "spin" => Animation::Spin { 
+                colors,
+                idx: 0,
+            },
             "smoothspin" => Animation::SmoothSpin {
                 colors,
                 period: SPIN_PERIOD,
@@ -59,16 +71,31 @@ impl Animation {
             "rainbowspin" => Animation::RainbowSpin { 
                 idx: 0
             },
+            // "rainbowsmoothspin" => Animation::RainbowSmoothSpin {
+            //     period: SPIN_PERIOD,
+            //     current_rotation: 0.0,
+            // },
             "mpd" => Animation::Mpd {
                 visualizer: MpdVisualizer::new(colors, SPIN_PERIOD),
             },
             _ => panic!("Unknown animation mode."),
         }
     }
+    
+    pub fn step_discrete_spin(leds: &mut [RgbS; N_LEDS], colors: &Vec<RgbS>, rotation_idx: &mut usize) {
+        *rotation_idx = (*rotation_idx + 1) % N_LEDS;
+        let color_step = colors.len() as f32 / N_LEDS as f32;
+    
+        for (i, led) in leds.iter_mut().enumerate() {
+            let led_idx = (i + *rotation_idx) % N_LEDS;
+            let color_idx = (led_idx as f32 * color_step) as usize;
+            *led = colors[color_idx % colors.len()];
+        }
+    }
 
     pub fn step_smoothspin(leds: &mut [RgbS; N_LEDS],
                        current_rotation: &mut f32,
-                       gradient: &Vec<RgbS>,
+                       gradient: &[RgbS],
                        period: u16
     ) {
         let step = if period == 0 {
@@ -82,18 +109,18 @@ impl Animation {
         Animation::map_gradient(leds, gradient, *current_rotation);
     }
     
-    pub fn map_gradient(samples: &mut [RgbS; N_LEDS], gradient: &Vec<RgbS>, rotation: f32) {
+    pub fn map_gradient(samples: &mut [RgbS; N_LEDS], gradient: &[RgbS], rotation: f32) {
         for (i, sample) in samples.iter_mut().enumerate() {
             let sample_pos = (rotation + i as f32) % N_LEDS as f32;
             *sample = sample_gradient(gradient, sample_pos, N_LEDS);
         }
     }
      
-    pub fn step_rainbow_spin(leds: &mut [RgbS; N_LEDS], idx: &mut usize) {
-        *idx = (*idx + 1) % N_LEDS;
+    pub fn step_rainbow_spin(leds: &mut [RgbS; N_LEDS], rotation_idx: &mut usize) {
+        *rotation_idx = (*rotation_idx + 1) % N_LEDS;
     
         for (i, led) in leds.iter_mut().enumerate() {
-            *led = RAINBOW[(*idx+i) % N_LEDS];
+            *led = RAINBOW[(*rotation_idx+i) % N_LEDS];
         }
     }
 
@@ -136,6 +163,9 @@ impl Animation {
                 *on = !*on;
                 
             },
+            Animation::Spin {colors, idx} => {
+                Animation::step_discrete_spin(leds, colors, idx);
+            },
             Animation::SmoothSpin {
                 colors,
                 period,
@@ -143,9 +173,15 @@ impl Animation {
             } => {
                 Animation::step_smoothspin(leds, current_rotation, colors, *period);
             },
-            Animation::RainbowSpin {idx: current_idx} => {
-                Animation::step_rainbow_spin(leds, current_idx);
+            Animation::RainbowSpin {idx} => {
+                Animation::step_rainbow_spin(leds, idx);
             },
+            // Animation::RainbowSmoothSpin {
+            //     period,
+            //     current_rotation,  
+            // } => {
+            //     Animation::step_smoothspin(leds, current_rotation, &RAINBOW, *period);
+            // },
             Animation::Mpd {
                 visualizer
             } => {
@@ -166,7 +202,7 @@ fn lerp(a: RgbS, b: RgbS, t: f32) -> RgbS {
 }
 
 // samples the true color gradient wheel at an led
-fn sample_gradient(colors: &Vec<RgbS>, pos: f32, slices: usize) -> RgbS {
+fn sample_gradient(colors: &[RgbS], pos: f32, slices: usize) -> RgbS {
     let n = colors.len();
 
     let scaled = pos * n as f32 / slices as f32;
