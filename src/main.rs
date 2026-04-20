@@ -10,7 +10,7 @@ mod mpd_visualizer;
 mod animations;
 mod consts;
 
-use consts::{OFF, N_LEDS, TICKRATE};
+use consts::{OFF, N_LEDS, TICK_TIME_MS};
 use animations::Animation;
 
 
@@ -59,7 +59,7 @@ fn main() -> EcResult<()> {
 
     let ec = CrosEc::new();
     
-    let mut leds: [RgbS; N_LEDS as usize] = [OFF; N_LEDS as usize];
+    let mut leds: [RgbS; N_LEDS] = [OFF; N_LEDS];
         
     loop {
         animation.step(&mut leds);
@@ -67,7 +67,7 @@ fn main() -> EcResult<()> {
         if let Err(e) = ec.rgbkbd_set_color(0, leds.to_vec()) {
             eprintln!("Error setting lights: {:?}", e);
         }
-        thread::sleep(Duration::from_millis(TICKRATE.into()));
+        thread::sleep(Duration::from_millis(TICK_TIME_MS.into()));
     }
         
 }

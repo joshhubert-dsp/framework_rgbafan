@@ -61,7 +61,7 @@ impl MpdVisualizer {
         }
     }
 
-    pub fn tick(&mut self, leds: &mut [RgbS; N_LEDS as usize]) {
+    pub fn tick(&mut self, leds: &mut [RgbS; N_LEDS]) {
         // 1. Open FIFO if needed
         if self.file.is_none() {
             let file_result = OpenOptions::new()
@@ -121,7 +121,7 @@ impl MpdVisualizer {
 
     // Converts raw PCM bytes to f32 and pushes to buffer.
     // Triggers FFT when buffer is full.
-    fn process_incoming_bytes(&mut self, data: &[u8], leds: &mut [RgbS; N_LEDS as usize]) {
+    fn process_incoming_bytes(&mut self, data: &[u8], leds: &mut [RgbS; N_LEDS]) {
         // 16-bit signed stereo = 4 bytes per frame (L+R)
         // We mix stereo down to mono for visualization
         for chunk in data.chunks_exact(4) {
