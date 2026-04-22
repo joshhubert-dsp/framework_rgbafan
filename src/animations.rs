@@ -1,16 +1,13 @@
 use framework_lib::chromium_ec::commands::RgbS;
 
-use crate::consts::{
-    N_LEDS,
-    SPIN_PERIOD,
-    OFF,
-    RAINBOW
-};
+use crate::consts::{N_LEDS, OFF, RAINBOW, SPIN_PERIOD};
 
 use crate::mpd_visualizer::MpdVisualizer;
 
 pub enum Animation {
-    Solid { color: RgbS },
+    Solid {
+        color: RgbS,
+    },
     Blink {
         colors: Vec<RgbS>,
         current_color_index: u8,
@@ -18,25 +15,20 @@ pub enum Animation {
     },
     Spin {
         colors: Vec<RgbS>,
-        idx: usize,    // current idx on discrete spin
+        idx: usize, // current idx on discrete spin
     },
     SmoothSpin {
         colors: Vec<RgbS>,
-        period: u16,              // unit in ticks
-        current_rotation: f32,    // unit in leds
+        period: u16,           // unit in ticks
+        current_rotation: f32, // unit in leds
     },
     RainbowSpin {
-        idx: usize,    // current idx on rolling rainbow
+        idx: usize, // current idx on rolling rainbow
     },
-    // RainbowSmoothSpin {
-    //     period: u16,              // unit in ticks
-    //     current_rotation: f32,    // unit in leds
-    // },
     Mpd {
         visualizer: MpdVisualizer,
     },
 }
-
 
 impl Animation {
     pub fn from_cli(modestr: &str, colors: Vec<RgbS>) -> Self {
@@ -46,35 +38,21 @@ impl Animation {
 
         match modestr {
             "solid" => {
-                let color = colors
-                    .first()
-                    .copied()
-                    .expect("Solid mode requires color");
-                Animation::Solid{ color }
-            },
-            "blink" => {
-                Animation::Blink{
-                    colors,
-                    current_color_index: 0,
-                    on: false,
-                }
-            },
-            "spin" => Animation::Spin {
+                let color = colors.first().copied().expect("Solid mode requires color");
+                Animation::Solid { color }
+            }
+            "blink" => Animation::Blink {
                 colors,
-                idx: 0,
+                current_color_index: 0,
+                on: false,
             },
+            "spin" => Animation::Spin { colors, idx: 0 },
             "smoothspin" => Animation::SmoothSpin {
                 colors,
                 period: SPIN_PERIOD,
                 current_rotation: 0.0,
             },
-            "rainbowspin" => Animation::RainbowSpin {
-                idx: 0
-            },
-            // "rainbowsmoothspin" => Animation::RainbowSmoothSpin {
-            //     period: SPIN_PERIOD,
-            //     current_rotation: 0.0,
-            // },
+            "rainbowspin" => Animation::RainbowSpin { idx: 0 },
             "mpd" => Animation::Mpd {
                 visualizer: MpdVisualizer::new(colors, SPIN_PERIOD),
             },
@@ -82,7 +60,11 @@ impl Animation {
         }
     }
 
-    pub fn step_discrete_spin(leds: &mut [RgbS; N_LEDS], colors: &Vec<RgbS>, rotation_idx: &mut usize) {
+    pub fn step_discrete_spin(
+        leds: &mut [RgbS; N_LEDS],
+        colors: &Vec<RgbS>,
+        rotation_idx: &mut usize,
+    ) {
         *rotation_idx = (*rotation_idx + 1) % N_LEDS;
         let color_step = colors.len() as f32 / N_LEDS as f32;
 
@@ -93,10 +75,11 @@ impl Animation {
         }
     }
 
-    pub fn step_smoothspin(leds: &mut [RgbS; N_LEDS],
-                       current_rotation: &mut f32,
-                       gradient: &[RgbS],
-                       period: u16
+    pub fn step_smoothspin(
+        leds: &mut [RgbS; N_LEDS],
+        current_rotation: &mut f32,
+        gradient: &[RgbS],
+        period: u16,
     ) {
         let step = if period == 0 {
             0.0
@@ -120,10 +103,9 @@ impl Animation {
         *rotation_idx = (*rotation_idx + 1) % N_LEDS;
 
         for (i, led) in leds.iter_mut().enumerate() {
-            *led = RAINBOW[(*rotation_idx+i) % N_LEDS];
+            *led = RAINBOW[(*rotation_idx + i) % N_LEDS];
         }
     }
-
 
     // stepper function
     pub fn step(&mut self, leds: &mut [RgbS; N_LEDS]) {
@@ -132,7 +114,7 @@ impl Animation {
                 for led in leds {
                     *led = color.clone();
                 }
-            },
+            }
             Animation::Blink {
                 colors,
                 current_color_index,
@@ -148,7 +130,6 @@ impl Animation {
                     } else {
                         *current_color_index += 1;
                     }
-
                 } else {
                     let current_color: RgbS = match colors.get_mut(*current_color_index as usize) {
                         Some(color) => *color,
@@ -161,36 +142,26 @@ impl Animation {
                 }
 
                 *on = !*on;
-
-            },
-            Animation::Spin {colors, idx} => {
+            }
+            Animation::Spin { colors, idx } => {
                 Animation::step_discrete_spin(leds, colors, idx);
-            },
+            }
             Animation::SmoothSpin {
                 colors,
                 period,
                 current_rotation,
             } => {
                 Animation::step_smoothspin(leds, current_rotation, colors, *period);
-            },
-            Animation::RainbowSpin {idx} => {
+            }
+            Animation::RainbowSpin { idx } => {
                 Animation::step_rainbow_spin(leds, idx);
-            },
-            // Animation::RainbowSmoothSpin {
-            //     period,
-            //     current_rotation,
-            // } => {
-            //     Animation::step_smoothspin(leds, current_rotation, &RAINBOW, *period);
-            // },
-            Animation::Mpd {
-                visualizer
-            } => {
+            }
+            Animation::Mpd { visualizer } => {
                 visualizer.tick(leds);
-            },
+            }
         }
     }
 }
-
 
 // linear interpolation between two colors
 fn lerp(a: RgbS, b: RgbS, t: f32) -> RgbS {
