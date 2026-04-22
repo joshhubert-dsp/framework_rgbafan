@@ -16,7 +16,7 @@ pub enum Animation {
         current_color_index: u8,
         on: bool,
     },
-    Spin { 
+    Spin {
         colors: Vec<RgbS>,
         idx: usize,    // current idx on discrete spin
     },
@@ -43,7 +43,7 @@ impl Animation {
         if colors.len() > N_LEDS {
             panic!("There can't be more colors than LEDS!")
         }
-        
+
         match modestr {
             "solid" => {
                 let color = colors
@@ -59,7 +59,7 @@ impl Animation {
                     on: false,
                 }
             },
-            "spin" => Animation::Spin { 
+            "spin" => Animation::Spin {
                 colors,
                 idx: 0,
             },
@@ -68,7 +68,7 @@ impl Animation {
                 period: SPIN_PERIOD,
                 current_rotation: 0.0,
             },
-            "rainbowspin" => Animation::RainbowSpin { 
+            "rainbowspin" => Animation::RainbowSpin {
                 idx: 0
             },
             // "rainbowsmoothspin" => Animation::RainbowSmoothSpin {
@@ -81,11 +81,11 @@ impl Animation {
             _ => panic!("Unknown animation mode."),
         }
     }
-    
+
     pub fn step_discrete_spin(leds: &mut [RgbS; N_LEDS], colors: &Vec<RgbS>, rotation_idx: &mut usize) {
         *rotation_idx = (*rotation_idx + 1) % N_LEDS;
         let color_step = colors.len() as f32 / N_LEDS as f32;
-    
+
         for (i, led) in leds.iter_mut().enumerate() {
             let led_idx = (i + *rotation_idx) % N_LEDS;
             let color_idx = (led_idx as f32 * color_step) as usize;
@@ -103,22 +103,22 @@ impl Animation {
         } else {
             N_LEDS as f32 / period as f32
         };
-        
+
         *current_rotation = (*current_rotation + step) % N_LEDS as f32;
 
         Animation::map_gradient(leds, gradient, *current_rotation);
     }
-    
+
     pub fn map_gradient(samples: &mut [RgbS; N_LEDS], gradient: &[RgbS], rotation: f32) {
         for (i, sample) in samples.iter_mut().enumerate() {
             let sample_pos = (rotation + i as f32) % N_LEDS as f32;
             *sample = sample_gradient(gradient, sample_pos, N_LEDS);
         }
     }
-     
+
     pub fn step_rainbow_spin(leds: &mut [RgbS; N_LEDS], rotation_idx: &mut usize) {
         *rotation_idx = (*rotation_idx + 1) % N_LEDS;
-    
+
         for (i, led) in leds.iter_mut().enumerate() {
             *led = RAINBOW[(*rotation_idx+i) % N_LEDS];
         }
@@ -142,26 +142,26 @@ impl Animation {
                     for led in leds {
                         *led = OFF;
                     }
-                    
+
                     if (*current_color_index as usize) >= (*colors).len() - 1 {
                         *current_color_index = 0;
                     } else {
                         *current_color_index += 1;
                     }
-                    
+
                 } else {
                     let current_color: RgbS = match colors.get_mut(*current_color_index as usize) {
                         Some(color) => *color,
                         None => panic!("Index {} is out of bounds", *current_color_index),
                     };
-                    
-                    for led in leds {                        
+
+                    for led in leds {
                         *led = current_color.clone();
                     }
                 }
 
                 *on = !*on;
-                
+
             },
             Animation::Spin {colors, idx} => {
                 Animation::step_discrete_spin(leds, colors, idx);
@@ -169,7 +169,7 @@ impl Animation {
             Animation::SmoothSpin {
                 colors,
                 period,
-                current_rotation,  
+                current_rotation,
             } => {
                 Animation::step_smoothspin(leds, current_rotation, colors, *period);
             },
@@ -178,7 +178,7 @@ impl Animation {
             },
             // Animation::RainbowSmoothSpin {
             //     period,
-            //     current_rotation,  
+            //     current_rotation,
             // } => {
             //     Animation::step_smoothspin(leds, current_rotation, &RAINBOW, *period);
             // },

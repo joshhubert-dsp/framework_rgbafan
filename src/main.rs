@@ -7,12 +7,15 @@ use framework_lib::chromium_ec::{CrosEc, EcResult};
 
 mod animations;
 mod consts;
+mod fan_speed;
 mod mpd_visualizer;
 
 use animations::Animation;
 use consts::{DEFAULT_TICK_TIME_MS, N_LEDS, OFF, SOLID_TICK_TIME_MS};
 
 use clap::{ColorChoice, Parser};
+
+use crate::fan_speed::{fan_speed_to_tick_time, get_fan_speed};
 
 /// Animate your Framework computer RGB fan!
 #[derive(Parser, Debug)]
@@ -24,12 +27,16 @@ struct Args {
 
     /// Integer number of milliseconds between updates, for all modes besides solid
     #[arg(default_value_t=DEFAULT_TICK_TIME_MS)]
-    tick_ms: u16,
+    tick_ms: u64,
 
     /// List of 1-8 color hex strings, specified with 6 characters each or 0 for OFF.
     /// Only the first is used for solid, and none are used for rainbow.
     #[arg(short, long, num_args = 1..9, default_values_t = ["ff0000".to_string(), "00ff00".to_string(), "0000ff".to_string()])]
     colors: Vec<String>,
+
+    // Pass this to make the fan speed control the update time, from 5 seconds with fan off to 1 millisecond with . tick_ms is
+    #[arg(short, long)]
+    speed_from_fan: bool,
 }
 
 #[derive(Debug)]
@@ -45,7 +52,7 @@ impl From<ParseIntError> for HexParseError {
 }
 
 fn parse_hex(s: &str) -> Result<RgbS, HexParseError> {
-    if s == "0"{
+    if s == "0" {
         return Ok(OFF);
     }
     if s.len() != 6 {
@@ -72,7 +79,7 @@ fn main() -> EcResult<()> {
 
     let mut animation = Animation::from_cli(&args.mode, colors);
 
-    let sleep_time: u16 = match animation {
+    let mut tick_time: u64 = match animation {
         Animation::Solid { color: _ } => SOLID_TICK_TIME_MS,
         _ => args.tick_ms,
     };
@@ -81,6 +88,8 @@ fn main() -> EcResult<()> {
 
     let mut leds: [RgbS; N_LEDS] = [OFF; N_LEDS];
 
+    let mut fan_rpm: u16;
+
     loop {
         animation.step(&mut leds);
 
@@ -88,7 +97,13 @@ fn main() -> EcResult<()> {
             eprintln!("Error setting lights: {:?}", e);
         }
 
+        if args.speed_from_fan {
+            fan_rpm = get_fan_speed(&ec).unwrap();
+            tick_time = fan_speed_to_tick_time(fan_rpm);
+            println!("  Fan Speed:  {:>4} RPM", fan_rpm);
+            println!("  Tick Time:  {:>4} ms", tick_time);
+        }
         // NOTE: this is the only place the program sleeps now
-        thread::sleep(Duration::from_millis(sleep_time.into()))
+        thread::sleep(Duration::from_millis(tick_time))
     }
 }
