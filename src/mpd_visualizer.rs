@@ -33,7 +33,7 @@ pub struct MpdVisualizer {
     fft: Arc<dyn Fft<f32>>,
     fft_buffer: Vec<Complex<f32>>,
     fft_scratch: Vec<Complex<f32>>,
-    
+
     // Fallback State
     fallback_gradient: Vec<RgbS>,
     fallback_angle: f32,
@@ -49,7 +49,7 @@ impl MpdVisualizer {
             fifo_path: PathBuf::from(FIFO_PATH),
             file: None,
             last_audio_time: Instant::now(),
-            
+
             // Buffer capacity: roughly enough for a few ticks of overflow
             sample_buffer: Vec::with_capacity(FFT_SIZE * 2),
             fft,
@@ -94,8 +94,8 @@ impl MpdVisualizer {
         // 3. Fallback Logic (Silence detection)
         if !audio_processed {
             let silence_duration = Instant::now().duration_since(self.last_audio_time);
-            
-            // If we have data buffered but not enough for a full FFT yet, 
+
+            // If we have data buffered but not enough for a full FFT yet,
             // we treat it as silence if no NEW data came in for 1 second.
             if silence_duration > Duration::from_secs(MPD_QUIET_TIMEOUT as u64) {
                 // Clear buffer so old audio doesn't flash when music resumes
@@ -104,8 +104,8 @@ impl MpdVisualizer {
                 Animation::step_smoothspin(
                     leds,
                     &mut self.fallback_angle,
-                    &self.fallback_gradient, 
-                    self.fallback_period, 
+                    &self.fallback_gradient,
+                    self.fallback_period,
                 );
             } else {
                 // Decay logic: If music is playing but we are between FFT frames,
@@ -127,7 +127,7 @@ impl MpdVisualizer {
         for chunk in data.chunks_exact(4) {
             let l_sample = i16::from_le_bytes([chunk[0], chunk[1]]) as f32;
             let r_sample = i16::from_le_bytes([chunk[2], chunk[3]]) as f32;
-            
+
             // Average channels and normalize to -1.0 .. 1.0
             let mono = (l_sample + r_sample) / 2.0 / 32768.0;
             self.sample_buffer.push(mono);
@@ -172,7 +172,7 @@ impl MpdVisualizer {
 
             // Apply slight log scaling to amplitude to match human hearing
             let amplitude = (avg_mag * 0.1).ln_1p().min(1.0).max(0.0);
-            
+
             // Get the base color for this frequency
             let base_color = self.get_freq_color(i);
 

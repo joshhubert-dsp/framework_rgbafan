@@ -12,6 +12,7 @@ It's mainly a wrapper + some animation logic for the
 done, but needing to run the `framework-system` binary each time you
 wanted to change anything seemed like a drag.
 
+
 ## Installation
 
 First, grab the repository by cloning into it, and going inside and
@@ -67,3 +68,35 @@ I've configured it to be the case that low frequency bass bands, are
 cool colors, and the high frequency bands correspond to the warm
 colors, with the rainbow being between them. If you want to change
 these, feel free to check out `mpd_visualizer::get_freq_color`.
+
+
+## CLI help text
+
+```
+Animate your Framework computer RGB fan!
+
+Usage: framework_rgbafan [OPTIONS] <MODE> [TICK_MS]
+
+Arguments:
+  <MODE>     Avaiable modes: static, sequence, random, randominput, quadspin,
+             fullspin, smoothspin, rainbowspin, mpd.
+  [TICK_MS]  Integer number of milliseconds between updates, for all modes
+             besides solid. [default: 32]
+
+Options:
+  -c, --colors <str>...       List of 1-8 color hex strings, specified with 6
+                              characters each or 0 for OFF. Only the first is
+                              used for solid, and none are used for rainbow.
+                              [default: ff0000 00ff00 0000ff]
+  -e, --effect <str>          Avaiable brightness effects: blink, pulse, cwfade,
+                              ccwfade, cwccwfade. Effects can be applied to any
+                              animation mode.
+  -p, --effect-period <uint>  Brightness effect period in units of ticks.
+                              [default: 20]
+  -s, --speed-from-fan        Flag to make the fan speed control the update
+                              time, from 500 ms with fan off to 1 ms with it at
+                              100%.
+  -h, --help                  Print help.
+  -V, --version               Print version.
+
+```

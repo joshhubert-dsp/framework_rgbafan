@@ -1,19 +1,26 @@
-use framework_lib::chromium_ec::commands::RgbS;
-
-use crate::consts::{N_LEDS, OFF, RAINBOW, SPIN_PERIOD};
-
+use crate::consts::{N_LEDS, RAINBOW, SPIN_PERIOD};
+use crate::effects::BrightnessEffect;
 use crate::mpd_visualizer::MpdVisualizer;
+use framework_lib::chromium_ec::commands::RgbS;
+use rand::{random, random_range};
 
 pub enum Animation {
-    Solid {
-        color: RgbS,
-    },
-    Blink {
+    Static {
         colors: Vec<RgbS>,
-        current_color_index: u8,
-        on: bool,
     },
-    Spin {
+    Sequence {
+        colors: Vec<RgbS>,
+        idx: usize, // current color idx
+    },
+    Random,
+    RandomFromInput {
+        colors: Vec<RgbS>,
+    },
+    QuadSpin {
+        colors: Vec<RgbS>,
+        idx: usize, // current idx on discrete spin
+    },
+    FullSpin {
         colors: Vec<RgbS>,
         idx: usize, // current idx on discrete spin
     },
@@ -37,16 +44,12 @@ impl Animation {
         }
 
         match modestr {
-            "solid" => {
-                let color = colors.first().copied().expect("Solid mode requires color");
-                Animation::Solid { color }
-            }
-            "blink" => Animation::Blink {
-                colors,
-                current_color_index: 0,
-                on: false,
-            },
-            "spin" => Animation::Spin { colors, idx: 0 },
+            "static" => Animation::Static { colors },
+            "sequence" => Animation::Sequence { colors, idx: 0 },
+            "random" => Animation::Random,
+            "randominput" => Animation::RandomFromInput { colors },
+            "quadspin" => Animation::QuadSpin { colors, idx: 0 },
+            "fullspin" => Animation::FullSpin { colors, idx: 0 },
             "smoothspin" => Animation::SmoothSpin {
                 colors,
                 period: SPIN_PERIOD,
@@ -57,21 +60,6 @@ impl Animation {
                 visualizer: MpdVisualizer::new(colors, SPIN_PERIOD),
             },
             _ => panic!("Unknown animation mode."),
-        }
-    }
-
-    pub fn step_discrete_spin(
-        leds: &mut [RgbS; N_LEDS],
-        colors: &Vec<RgbS>,
-        rotation_idx: &mut usize,
-    ) {
-        *rotation_idx = (*rotation_idx + 1) % N_LEDS;
-        let color_step = colors.len() as f32 / N_LEDS as f32;
-
-        for (i, led) in leds.iter_mut().enumerate() {
-            let led_idx = (i + *rotation_idx) % N_LEDS;
-            let color_idx = (led_idx as f32 * color_step) as usize;
-            *led = colors[color_idx % colors.len()];
         }
     }
 
@@ -99,52 +87,52 @@ impl Animation {
         }
     }
 
-    pub fn step_rainbow_spin(leds: &mut [RgbS; N_LEDS], rotation_idx: &mut usize) {
-        *rotation_idx = (*rotation_idx + 1) % N_LEDS;
-
-        for (i, led) in leds.iter_mut().enumerate() {
-            *led = RAINBOW[(*rotation_idx + i) % N_LEDS];
-        }
-    }
-
     // stepper function
-    pub fn step(&mut self, leds: &mut [RgbS; N_LEDS]) {
+    pub fn step(
+        &mut self,
+        leds: &mut [RgbS; N_LEDS],
+        effect: Option<&mut BrightnessEffect>,
+    ) {
         match self {
-            Animation::Solid { color } => {
-                for led in leds {
-                    *led = color.clone();
+            Animation::Static { colors } => {
+                map_colors_to_led_range(leds, &colors, 0);
+            }
+            Animation::Sequence { colors, idx } => {
+                for led in leds.iter_mut() {
+                    *led = colors[*idx];
+                }
+                *idx += 1;
+                *idx %= colors.len();
+            }
+            Animation::Random => {
+                for led in leds.iter_mut() {
+                    led.r = random::<u8>();
+                    led.g = random::<u8>();
+                    led.b = random::<u8>();
                 }
             }
-            Animation::Blink {
-                colors,
-                current_color_index,
-                on,
-            } => {
-                if *on {
-                    for led in leds {
-                        *led = OFF;
-                    }
-
-                    if (*current_color_index as usize) >= (*colors).len() - 1 {
-                        *current_color_index = 0;
-                    } else {
-                        *current_color_index += 1;
-                    }
-                } else {
-                    let current_color: RgbS = match colors.get_mut(*current_color_index as usize) {
-                        Some(color) => *color,
-                        None => panic!("Index {} is out of bounds", *current_color_index),
-                    };
-
-                    for led in leds {
-                        *led = current_color.clone();
-                    }
+            Animation::RandomFromInput { colors } => {
+                for led in leds.iter_mut() {
+                    let rf = random::<f32>();
+                    let rc = colors[random_range(..colors.len())];
+                    led.r = (rc.r as f32 * rf) as u8;
+                    led.g = (rc.g as f32 * rf) as u8;
+                    led.b = (rc.b as f32 * rf) as u8;
                 }
-
-                *on = !*on;
             }
-            Animation::Spin { colors, idx } => {
-                Animation::step_discrete_spin(leds, colors, idx);
+            Animation::QuadSpin { colors, idx } => {
+                for i in 0..4 as usize {
+                    let color = colors[(*idx + i) % colors.len()];
+                    leds[2 * i] = color;
+                    leds[2 * i + 1] = color;
+                }
+                *idx += 1;
+                *idx %= colors.len();
+            }
+            Animation::FullSpin { colors, idx } => {
+                map_colors_to_led_range(leds, &colors, *idx);
+                *idx += 1;
+                *idx %= N_LEDS;
             }
             Animation::SmoothSpin {
                 colors,
@@ -154,16 +142,46 @@ impl Animation {
                 Animation::step_smoothspin(leds, current_rotation, colors, *period);
             }
             Animation::RainbowSpin { idx } => {
-                Animation::step_rainbow_spin(leds, idx);
+                for (i, led) in leds.iter_mut().enumerate() {
+                    *led = RAINBOW[(*idx + i) % N_LEDS];
+                }
+                *idx += 1;
+                *idx %= N_LEDS;
             }
             Animation::Mpd { visualizer } => {
                 visualizer.tick(leds);
             }
         }
+
+        if let Some(effect) = effect {
+            effect.step(leds);
+        }
     }
 }
 
-// linear interpolation between two colors
+/// expands N colors discretely over M leds
+fn map_colors_to_led_range(
+    leds: &mut [RgbS; N_LEDS],
+    colors: &[RgbS],
+    led_offset: usize,
+) {
+    if colors.len() == 1 {
+        for led in leds {
+            *led = colors[0];
+        }
+        return;
+    }
+
+    let color_step = colors.len() as f32 / N_LEDS as f32;
+
+    for (i, led) in leds.iter_mut().enumerate() {
+        let led_idx = (i + led_offset) % N_LEDS;
+        let color_idx = (led_idx as f32 * color_step).floor() as usize;
+        *led = colors[color_idx % colors.len()];
+    }
+}
+
+/// linear interpolation between two colors
 fn lerp(a: RgbS, b: RgbS, t: f32) -> RgbS {
     RgbS {
         r: (a.r as f32 + (b.r as f32 - a.r as f32) * t).round() as u8,
@@ -172,7 +190,7 @@ fn lerp(a: RgbS, b: RgbS, t: f32) -> RgbS {
     }
 }
 
-// samples the true color gradient wheel at an led
+/// samples the true color gradient wheel at an led
 fn sample_gradient(colors: &[RgbS], pos: f32, slices: usize) -> RgbS {
     let n = colors.len();
 

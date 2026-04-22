@@ -22,10 +22,11 @@ pub enum FanSpeedReadError {
 
 pub type FanSpeedResult = Result<u16, FanSpeedReadError>;
 
-// assuming we're only working with 1 fan on framework desktop
+/// assuming we're only working with 1 fan on framework desktop
 pub fn get_fan_speed(ec: &CrosEc) -> FanSpeedResult {
     let fan_bytes = ec.read_memory(EC_MEMMAP_FAN, EC_FAN_READ_BYTES).unwrap();
-    let fan_int = u16::from_le_bytes([*fan_bytes.first().unwrap(), *fan_bytes.get(1).unwrap()]);
+    let fan_int =
+        u16::from_le_bytes([*fan_bytes.first().unwrap(), *fan_bytes.get(1).unwrap()]);
 
     match fan_int {
         EC_FAN_SPEED_STALLED_DEPRECATED => Err(FanSpeedReadError::StalledDeprectated),
@@ -34,13 +35,13 @@ pub fn get_fan_speed(ec: &CrosEc) -> FanSpeedResult {
     }
 }
 
-// converts fan rpm to a fraction of maximum
+/// converts fan rpm to a fraction of maximum
 fn fan_speed_to_fraction(rpm: u16) -> f32 {
     let rpm = (rpm as f32).clamp(MIN_FAN_RPM, MAX_FAN_RPM);
     (rpm - MIN_FAN_RPM) / (MAX_FAN_RPM - MIN_FAN_RPM)
 }
 
-// converts fan rpm to update tick time in ms, inverse linear relationship
+/// converts fan rpm to update tick time in ms, inverse linear relationship
 pub fn fan_speed_to_tick_time(rpm: u16) -> u64 {
     let rpm_frac = fan_speed_to_fraction(rpm);
     let tick_frac = 1.0 - rpm_frac;

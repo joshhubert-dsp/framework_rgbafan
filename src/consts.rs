@@ -8,6 +8,7 @@ pub const DEFAULT_TICK_TIME_MS: u64 = 32;
 // how often to refresh solid color in case computer enters sleep mode or something
 pub const SOLID_TICK_TIME_MS: u64 = 5 * UNIT_MS;
 pub const SPIN_PERIOD: u16 = (UNIT_MS as u16 / DEFAULT_TICK_TIME_MS as u16) * 5;
+pub const DEFAULT_BRIGHTNESS_EFFECT_PERIOD: usize = 20; // in ticks
 
 pub const OFF: RgbS = RgbS { r: 0, g: 0, b: 0 };
 

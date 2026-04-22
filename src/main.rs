@@ -1,27 +1,26 @@
-use std::num::ParseIntError;
-use std::thread;
-use std::time::Duration;
-
-use framework_lib::chromium_ec::commands::RgbS;
-use framework_lib::chromium_ec::{CrosEc, EcResult};
-
 mod animations;
 mod consts;
+mod effects;
 mod fan_speed;
 mod mpd_visualizer;
 
-use animations::Animation;
-use consts::{DEFAULT_TICK_TIME_MS, N_LEDS, OFF, SOLID_TICK_TIME_MS};
-
-use clap::{ColorChoice, Parser};
-
+use crate::animations::Animation;
+use crate::consts::DEFAULT_BRIGHTNESS_EFFECT_PERIOD;
+use crate::consts::{DEFAULT_TICK_TIME_MS, N_LEDS, OFF, SOLID_TICK_TIME_MS};
+use crate::effects::{BrightnessEffect, opt_brightness_effect_from_cli};
 use crate::fan_speed::{fan_speed_to_tick_time, get_fan_speed};
+use clap::{ColorChoice, Parser};
+use framework_lib::chromium_ec::commands::RgbS;
+use framework_lib::chromium_ec::{CrosEc, EcResult};
+use std::num::ParseIntError;
+use std::thread;
+use std::time::Duration;
 
 /// Animate your Framework computer RGB fan!
 #[derive(Parser, Debug)]
 #[command(version, about, color = ColorChoice::Auto, long_about = None)]
 struct Args {
-    /// Avaiable modes: solid, blink, spin, smoothspin, rainbowspin, mpd
+    /// Avaiable modes: static, sequence, random, randominput, quadspin, fullspin, smoothspin, rainbowspin, mpd
     #[arg(required = true)]
     mode: String,
 
@@ -31,10 +30,18 @@ struct Args {
 
     /// List of 1-8 color hex strings, specified with 6 characters each or 0 for OFF.
     /// Only the first is used for solid, and none are used for rainbow.
-    #[arg(short, long, num_args = 1..9, default_values_t = ["ff0000".to_string(), "00ff00".to_string(), "0000ff".to_string()])]
+    #[arg(short, long, value_name = "str", num_args = 1..9, default_values_t = ["ff0000".to_string(), "00ff00".to_string(), "0000ff".to_string()])]
     colors: Vec<String>,
 
-    // Pass this to make the fan speed control the update time, from 5 seconds with fan off to 1 millisecond with . tick_ms is
+    /// Avaiable brightness effects: blink, pulse, cwfade, ccwfade, cwccwfade. Effects can be applied to any animation mode.
+    #[arg(short, long, value_name = "str")]
+    effect: Option<String>,
+
+    /// Brightness effect period in units of ticks.
+    #[arg(short = 'p', long = "effect-period", value_name = "uint", default_value_t = DEFAULT_BRIGHTNESS_EFFECT_PERIOD)]
+    effect_period: usize,
+
+    /// Flag to make the fan speed control the update time, from 500 ms with fan off to 1 ms with it at 100%.
     #[arg(short, long)]
     speed_from_fan: bool,
 }
@@ -72,15 +79,17 @@ fn args_to_rgbs(args: Vec<String>) -> Result<Vec<RgbS>, HexParseError> {
 
 fn main() -> EcResult<()> {
     let args = Args::parse();
-    // println!("{:#?}", args);
+    println!("{:#?}", args);
 
     let colors: Vec<RgbS> = args_to_rgbs(args.colors)
         .unwrap_or_else(|e| panic!("Failed to parse color argument: {e:?}"));
 
     let mut animation = Animation::from_cli(&args.mode, colors);
+    let mut effect: Option<BrightnessEffect> =
+        opt_brightness_effect_from_cli(args.effect, args.effect_period);
 
     let mut tick_time: u64 = match animation {
-        Animation::Solid { color: _ } => SOLID_TICK_TIME_MS,
+        Animation::Static { colors: _ } => SOLID_TICK_TIME_MS,
         _ => args.tick_ms,
     };
 
@@ -91,7 +100,7 @@ fn main() -> EcResult<()> {
     let mut fan_rpm: u16;
 
     loop {
-        animation.step(&mut leds);
+        animation.step(&mut leds, effect.as_mut());
 
         if let Err(e) = ec.rgbkbd_set_color(0, leds.to_vec()) {
             eprintln!("Error setting lights: {:?}", e);
@@ -100,8 +109,8 @@ fn main() -> EcResult<()> {
         if args.speed_from_fan {
             fan_rpm = get_fan_speed(&ec).unwrap();
             tick_time = fan_speed_to_tick_time(fan_rpm);
-            println!("  Fan Speed:  {:>4} RPM", fan_rpm);
-            println!("  Tick Time:  {:>4} ms", tick_time);
+            // println!("  Fan Speed:  {:>4} RPM", fan_rpm);
+            // println!("  Tick Time:  {:>4} ms", tick_time);
         }
         // NOTE: this is the only place the program sleeps now
         thread::sleep(Duration::from_millis(tick_time))

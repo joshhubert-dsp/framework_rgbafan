@@ -4,9 +4,10 @@ version = "1.0.0"
 edition = "2024"
 
 [dependencies]
-framework_lib = { git = "https://github.com/FrameworkComputer/framework-system.git" }
 anyhow = "1.0"
+clap = { version = "4.6.1", features = ["derive", "wrap_help"] }
+framework_lib = { git = "https://github.com/FrameworkComputer/framework-system.git" }
 libc = "0.2.178"
-rustfft = "6.4.1"
 num-complex = "0.4.6"
-clap = { version = "4.6.1", features = ["derive"] }
+rand = "0.10.1"
+rustfft = "6.4.1"
