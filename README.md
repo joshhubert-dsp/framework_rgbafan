@@ -41,21 +41,10 @@ If you want to daemonize it, you might want to write something along the lines o
 to `/etc/systemd/system/frmwk-rgb-fan.service`, and run
 `sudo systemctl daemon-reload ; sudo systemctl enable --now frmwk-rgb-fan.service`
 
-## Usage
-Since all framework RGB fans are identical, to keep things simple, and
-considering that it's necessary to run as root, I just hardcoded most
-of the configuration into `src/consts.rs`, so change those if you want
-to use this with adjusted settings.
+## Music Visualizer Usage
 
-The first argument to the program is the modestring, the available
-modes are `solid`, `blink`, `smoothspin`, `mpd`. Everything afterwards
-should be any number of hex colors without the `#`. Solid mode will
-only display the first color, blink mode will display the colors in
-the order given. Smoothspin mode rotates a gradient wheel clockwise,
-with the colors spaced with radial symmetry. In order for MPD mode to
-work, ensure the following code block is in your
+In order for MPD mode to work, ensure the following code block is in your
 `~/.config/mpd.config`.
-
 
     audio_output {
         type                    "fifo"
@@ -73,30 +62,41 @@ these, feel free to check out `mpd_visualizer::get_freq_color`.
 ## CLI help text
 
 ```
-Animate your Framework computer RGB fan!
+Animate your Framework computer RGB fan! Don't forget sudo! Personal favorite:
+`sudo framework_rgbafan smoothspin 20 -e cwfade -p 50`
 
-Usage: framework_rgbafan [OPTIONS] <MODE> [TICK_MS]
+Usage: sudo framework_rgbafan [OPTIONS] <MODE> [TICK_MS]
 
 Arguments:
-  <MODE>     Avaiable modes: static, sequence, random, randominput, quadspin,
-             fullspin, smoothspin, rainbowspin, mpd.
-  [TICK_MS]  Integer number of milliseconds between updates, for all modes
-             besides solid. [default: 32]
+  <MODE>     Available animation modes: static, sequence, random, randominput,
+             quadspin, fullspin, smoothspin, rainbowspin, mpd. 
+             - static: static color(s) across all LEDs, no animation. 
+             - sequence: iterate through colors, one on all LEDs at a time. 
+             - random: random colors on each LED changing every update. 
+             - randominput: random brightnesses selected from passed colors on each LED changing every update, can achieve fireplace flicker vibe. 
+             - quadspin: LEDs divided into 4 quadrants of color cycling discretely. 
+             - fullspin: spinning colors across all LEDs. 
+             - smoothspin: spinning color gradient with interpolation across all LEDs. 
+             - rainbowspin: spinning rainbow across all LEDs. 
+             - mpd: music visualizer mode, see README.
+  [TICK_MS]  Integer number of milliseconds between updates [default: 32]
 
 Options:
   -c, --colors <str>...       List of 1-8 color hex strings, specified with 6
-                              characters each or 0 for OFF. Only the first is
-                              used for solid, and none are used for rainbow.
-                              [default: ff0000 00ff00 0000ff]
-  -e, --effect <str>          Avaiable brightness effects: blink, pulse, cwfade,
-                              ccwfade, cwccwfade. Effects can be applied to any
-                              animation mode.
+                              characters each or a single 0 for LED off. For
+                              static and 'spin' modes, if fewer than 8 colors
+                              are specified, they will map linearly across the
+                              8 LEDs. rainbowspin has preset colors and
+                              therefore ignores this list. [default: ff0000
+                              00ff00 0000ff]
+  -e, --effect <str>          Available brightness effects: blink, pulse,
+                              cwfade, ccwfade, cwccwfade. Effects can be
+                              optionally applied to any animation mode.
   -p, --effect-period <uint>  Brightness effect period in units of ticks.
                               [default: 20]
   -s, --speed-from-fan        Flag to make the fan speed control the update
-                              time, from 500 ms with fan off to 1 ms with it at
-                              100%.
+                              time, from 500 ms with fan off to 1 ms with it
+                              at 100%.
   -h, --help                  Print help.
   -V, --version               Print version.
-
 ```

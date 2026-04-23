@@ -5,8 +5,6 @@ pub const UNIT_MS: u64 = 1000;
 pub const N_LEDS: usize = 8;
 // time the program sleeps for between updates, milliseconds
 pub const DEFAULT_TICK_TIME_MS: u64 = 32;
-// how often to refresh solid color in case computer enters sleep mode or something
-pub const SOLID_TICK_TIME_MS: u64 = 5 * UNIT_MS;
 pub const SPIN_PERIOD: u16 = (UNIT_MS as u16 / DEFAULT_TICK_TIME_MS as u16) * 5;
 pub const DEFAULT_BRIGHTNESS_EFFECT_PERIOD: usize = 20; // in ticks
 

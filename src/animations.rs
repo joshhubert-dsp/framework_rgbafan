@@ -1,5 +1,4 @@
 use crate::consts::{N_LEDS, RAINBOW, SPIN_PERIOD};
-use crate::effects::BrightnessEffect;
 use crate::mpd_visualizer::MpdVisualizer;
 use framework_lib::chromium_ec::commands::RgbS;
 use rand::{random, random_range};
@@ -88,11 +87,7 @@ impl Animation {
     }
 
     // stepper function
-    pub fn step(
-        &mut self,
-        leds: &mut [RgbS; N_LEDS],
-        effect: Option<&mut BrightnessEffect>,
-    ) {
+    pub fn step(&mut self, leds: &mut [RgbS; N_LEDS]) {
         match self {
             Animation::Static { colors } => {
                 map_colors_to_led_range(leds, &colors, 0);
@@ -151,10 +146,6 @@ impl Animation {
             Animation::Mpd { visualizer } => {
                 visualizer.tick(leds);
             }
-        }
-
-        if let Some(effect) = effect {
-            effect.step(leds);
         }
     }
 }

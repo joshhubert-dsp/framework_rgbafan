@@ -101,20 +101,20 @@ impl BrightnessEffect {
                 spinfade(leds, period, idx, false)
             }
             BrightnessEffect::CwCcwFade { period, idx, cw } => {
+                spinfade(leds, period, idx, *cw);
                 if *idx == 0 {
                     *cw = !*cw;
                 }
-                spinfade(leds, period, idx, *cw);
             }
         }
     }
 }
 
 fn spinfade(leds: &mut [RgbS], period: &usize, idx: &mut usize, cw: bool) {
-    let mut offset: i64 = if *period == 0 {
+    let mut offset: i8 = if *period == 0 {
         0
     } else {
-        ((*idx * N_LEDS / *period) % N_LEDS) as i64
+        (((*idx * N_LEDS) / *period) % N_LEDS) as i8
     };
     if !cw {
         offset *= -1;
@@ -122,7 +122,7 @@ fn spinfade(leds: &mut [RgbS], period: &usize, idx: &mut usize, cw: bool) {
 
     for (i, led) in leds.iter_mut().enumerate() {
         let dim_scale =
-            SPINFADE_SCALES[((i as i64 + offset).rem_euclid(N_LEDS as i64)) as usize];
+            SPINFADE_SCALES[((i as i8 + offset).rem_euclid(N_LEDS as i8)) as usize];
         led.r = (dim_scale * led.r as f32) as u8;
         led.g = (dim_scale * led.g as f32) as u8;
         led.b = (dim_scale * led.b as f32) as u8;
